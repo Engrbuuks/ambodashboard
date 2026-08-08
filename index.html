@@ -377,6 +377,16 @@ button.hm-lab:hover{color:var(--blue-d);background:var(--blue-l)}
 .hm-legend .k{font-size:11.5px;color:var(--tx-3)}
 .hm-legend .k b{color:var(--navy);font-family:var(--f-d)}
 .hm-legend .sp{flex:1;min-width:12px}
+
+.evid{display:flex;align-items:center;gap:11px;background:var(--bg);border-radius:12px;padding:11px 13px;
+  margin-bottom:8px;text-decoration:none;color:inherit}
+.evid:hover{background:#EAEFF6}
+.evid .ei{width:36px;height:36px;border-radius:11px;background:var(--blue-l);color:var(--blue-d);display:grid;place-items:center;flex:none}
+.evid .ei svg{width:18px;height:18px}
+.evid .et b{display:block;font-family:var(--f-d);font-size:13px;font-weight:600;color:var(--navy)}
+.evid .et span{display:block;font-size:11.5px;color:var(--tx-3);margin-top:2px}
+.camtag{display:inline-flex;vertical-align:middle;color:var(--blue);margin-left:5px}
+.camtag svg{width:14px;height:14px}
 </style></head><body>
 
 <div id="auth">
@@ -544,6 +554,14 @@ button.hm-lab:hover{color:var(--blue-d);background:var(--blue-l)}
       <tbody id="c-body"></tbody></table>
     </div>
 
+    <div class="card" style="margin-bottom:16px">
+      <div class="tbar"><h3>Field agents</h3><span class="sub" id="ag-count"></span>
+        <button class="btn pri" id="ag-add" style="margin-left:auto">Add agent</button></div>
+      <table><thead><tr><th>Agent</th><th>Covers</th><th>Where</th><th>Handset</th><th></th></tr></thead>
+      <tbody id="ag-body"></tbody></table>
+      <div class="note" style="padding:12px 20px 16px">Agents sign in with their phone number. The first handset to use a number claims it — use <b>Release</b> if someone changes phone.</div>
+    </div>
+
     <div class="grid2">
       <div class="card"><div class="hd"><h3>Geography</h3><span class="sub">INEC delimitation</span></div>
         <div class="bd" id="g-card"></div></div>
@@ -630,7 +648,7 @@ var PU_NAMES=['Baptist Primary School','Town Hall','LGEA Primary School','Open S
 'Community Grammar School','Health Centre Compound','Central Mosque Compound','Village Square'];
 var AGENTS=['A. Yusuf','M. Adeoye','T. Ibrahim','K. Olaniyi','S. Bello','R. Afolabi','J. Ogundele'];
 
-var DB={users:[],contacts:[],incidents:[],events:[],notes:[],seq:20};
+var DB={users:[],contacts:[],incidents:[],events:[],notes:[],agents:[],seq:20};
 var GEO={lgas:LGAS.slice(),wards:{},counts:{lgas:30,wards:0,pus:0},puCache:{},real:false};
 var S={user:null,view:'dashboard',show:{responders:true,control:true},period:'day',tFilter:'all',cScope:'all',F:{lga:'',ward:'',severity:'',status:'',type:'',who:''},sel:null,lga:null,seen:{},alertQ:[],alerting:null,sound:true,iFilter:'open',cScope:'all'};
 
@@ -648,6 +666,8 @@ function tier(s){return s>900?'h':(s>300?'w':'q');}
 function key(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 
 var I={
+ cam:'<svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.3-2h6.4l1.3 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.6"/></svg>',
+ pinf:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>',
  filter:'<svg viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></svg>',
  clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
  bell:'<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
@@ -883,7 +903,7 @@ async function signInLive(em,pw){
 }
 async function pullAll(){
   var j=await apiGet({action:'bootstrap',secret:CFG.secret,token:CFG.token});
-  DB.incidents=j.incidents||[];DB.contacts=j.contacts||[];DB.notes=j.notes||[];
+  DB.incidents=j.incidents||[];DB.contacts=j.contacts||[];DB.notes=j.notes||[];DB.agents=j.agents||[];
   if(j.geo&&j.geo.lgas&&j.geo.lgas.length){
     GEO.lgas=j.geo.lgas;GEO.wards=j.geo.wards||{};GEO.counts=j.geo.counts||GEO.counts;GEO.puCache={};GEO.real=true; }
   if(j.users&&j.users.length) DB.users=j.users;
@@ -1231,7 +1251,8 @@ function renderTable(){
   el.innerHTML=list.slice(0,80).map(function(i){
     var e=elapsed(i.loggedAt), done=i.status==='Resolved', tr=done?'done':tier(e);
     return '<tr data-ref="'+esc(i.ref)+'" style="cursor:pointer"><td><div class="who"><div class="ic '+tr+'">'+typeIcon(i.type)+'</div>'+
-      '<div><div class="t">'+esc(i.type)+'</div><div class="s">'+esc(i.ref)+'</div></div></div></td>'+
+      '<div><div class="t">'+esc(i.type)+(i.photo?' <span class="camtag">'+I.cam+'</span>':'')+'</div>'+
+      '<div class="s">'+esc(i.ref)+(i.source==='AMBO Field App'?' · field app':'')+'</div></div></div></td>'+
       '<td>'+esc(i.lga)+'<div class="s" style="font-size:11.5px;color:var(--tx-3);margin-top:2px">'+esc(i.ward)+', '+esc(i.unit)+'</div></td>'+
       '<td class="mono" style="font-size:12px">'+hhmmA(new Date(i.loggedAt))+'</td>'+
       '<td><span class="pill '+esc(i.severity.toLowerCase())+'">'+esc(i.severity)+'</span></td>'+
@@ -1715,7 +1736,7 @@ function renderHeat(){
 /* ── control centre ── */
 function renderControl(){
   if(!isAdmin()) return;
-  renderContactsTable(); renderAccounts(); renderGeoCard(); renderFeed();
+  renderContactsTable(); renderAccounts(); renderAgents(); renderGeoCard(); renderFeed();
 }
 function isAdmin(){ return S.user && S.user.role!=='responder'; }
 
@@ -1754,6 +1775,91 @@ function renderAccounts(){
         '<button class="btn" style="padding:7px 13px;font-size:12px" data-reset-user="'+esc(u.id)+'">Reset</button></td></tr>';
   }).join('');
   document.getElementById('u-count').textContent=DB.users.length+' accounts';
+}
+function renderAgents(){
+  var el=document.getElementById('ag-body'); if(!el) return;
+  var list=DB.agents||[];
+  document.getElementById('ag-count').textContent=list.length+' agents';
+  el.innerHTML=list.length?list.map(function(a){
+    var scope=a.scope==='PU'?(a.puCode||'polling unit')
+            :a.scope==='Ward'?(a.lga+' · '+a.ward)
+            :(a.lga+' (whole LGA)');
+    return '<tr><td><div class="who"><div class="ic">'+esc(initials(a.name))+'</div>'+
+      '<div><div class="t">'+esc(a.name)+(a.active?'':' <span class="pill escalated">off</span>')+'</div>'+
+      '<div class="s mono">'+esc(a.display||a.phone)+'</div></div></div></td>'+
+      '<td><span class="pill '+(a.scope==='PU'?'high':a.scope==='Ward'?'resolved':'medium')+'">'+esc(a.scope||'LGA')+'</span></td>'+
+      '<td class="mono" style="font-size:12px">'+esc(scope)+'</td>'+
+      '<td>'+(a.device?'<span class="pill resolved">bound</span>':'<span class="pill low">not signed in</span>')+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+
+        '<button class="btn" style="padding:7px 11px;font-size:12px" data-edit-agent="'+esc(a.phone)+'">Edit</button> '+
+        (a.device?'<button class="btn" style="padding:7px 11px;font-size:12px" data-release-agent="'+esc(a.display||a.phone)+'">Release</button>':'')+
+      '</td></tr>';
+  }).join('')
+   :'<tr><td colspan="5"><div class="empty"><b>No field agents yet</b>Add the people who will file reports from polling units.</div></td></tr>';
+}
+function agentForm(a){
+  a=a||{phone:'',name:'',scope:'LGA',lga:(GEO.lgas[0]||'Osogbo'),ward:'',puCode:'',puName:'',active:true};
+  return '<h3>'+(a.phone?'Edit agent':'Add field agent')+'</h3>'+
+    '<div class="sub">They sign in with this phone number. The first handset to use it claims it.</div>'+
+    '<div class="frow"><label>Phone number</label><input class="fldx" id="g-phone" value="'+esc(a.display||a.phone)+'" placeholder="0803 123 4567"></div>'+
+    '<div class="frow"><label>Name</label><input class="fldx" id="g-name" value="'+esc(a.name)+'"></div>'+
+    '<div class="frow"><label>Covers</label><div class="segwide" id="g-scope">'+
+      ['LGA','Ward','PU'].map(function(s){ return '<button type="button" data-gscope="'+s+'" class="'+(a.scope===s?'on':'')+'">'+(s==='PU'?'One unit':s)+'</button>'; }).join('')+'</div></div>'+
+    '<div class="frow"><label>Local government</label><select class="fldx" id="g-lga">'+
+      GEO.lgas.map(function(l){ return '<option'+(l===a.lga?' selected':'')+'>'+esc(l)+'</option>'; }).join('')+'</select></div>'+
+    '<div class="frow'+(a.scope==='LGA'?' hide':'')+'" id="g-row-ward"><label>Ward</label><select class="fldx" id="g-ward"></select></div>'+
+    '<div class="frow'+(a.scope==='PU'?'':' hide')+'" id="g-row-pu"><label>Polling unit code</label><input class="fldx" id="g-pu" value="'+esc(a.puCode)+'" placeholder="30/30/03/012"></div>'+
+    '<div class="frow"><label style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--tx-2)">'+
+      '<input type="checkbox" id="g-active" '+(a.active!==false?'checked':'')+' style="accent-color:var(--green);margin-right:8px">Active</label></div>'+
+    '<div class="mrow"><button class="btn" data-close>Cancel</button>'+
+      (a.phone?'<button class="btn" data-del-agent="'+esc(a.display||a.phone)+'">Remove</button>':'')+
+      '<button class="btn pri" data-save-agent="'+esc(a.phone||'')+'">Save</button></div>';
+}
+var AFORM={scope:'LGA',ward:''};
+function wireAgentForm(a){
+  a=a||{scope:'LGA',ward:''};
+  AFORM.scope=a.scope||'LGA'; AFORM.ward=a.ward||'';
+  var lga=document.getElementById('g-lga');
+  function paint(){
+    Array.prototype.forEach.call(document.querySelectorAll('#g-scope button'),function(b){
+      b.classList.toggle('on',b.dataset.gscope===AFORM.scope); });
+    document.getElementById('g-row-ward').classList.toggle('hide',AFORM.scope==='LGA');
+    document.getElementById('g-row-pu').classList.toggle('hide',AFORM.scope!=='PU');
+  }
+  function fill(){
+    var ws=wardsOf(lga.value), sel=document.getElementById('g-ward');
+    sel.innerHTML=ws.length?ws.map(function(w){ return '<option'+(w===AFORM.ward?' selected':'')+'>'+esc(w)+'</option>'; }).join('')
+      :'<option value="">No wards loaded</option>';
+    if(ws.length&&ws.indexOf(AFORM.ward)<0) AFORM.ward=ws[0];
+    sel.value=AFORM.ward;
+  }
+  paint(); fill();
+  document.getElementById('g-scope').addEventListener('click',function(e){
+    var b=e.target.closest('[data-gscope]'); if(!b) return;
+    AFORM.scope=b.dataset.gscope; paint(); if(AFORM.scope!=='LGA') fill(); });
+  lga.addEventListener('change',function(){ AFORM.ward=''; fill(); });
+  document.getElementById('g-ward').addEventListener('change',function(){ AFORM.ward=this.value; });
+}
+function saveAgent(){
+  var phone=document.getElementById('g-phone').value.trim();
+  var name=document.getElementById('g-name').value.trim();
+  var lga=document.getElementById('g-lga').value;
+  var pu=document.getElementById('g-pu').value.trim();
+  if(!name||phone.replace(/\D/g,'').length<10){ toast('An agent needs a name and a full phone number','err'); return; }
+  if(AFORM.scope==='Ward'&&!AFORM.ward){ toast('Choose a ward','err'); return; }
+  if(AFORM.scope==='PU'&&!pu){ toast('Enter the polling unit code','err'); return; }
+  var rec={ phone:phone, name:name, scope:AFORM.scope, lga:lga,
+            ward:AFORM.scope==='LGA'?'':AFORM.ward, puCode:AFORM.scope==='PU'?pu:'',
+            active:document.getElementById('g-active').checked };
+  if(live()){ apiPost({op:'saveAgent',agent:rec})
+    .then(function(j){ DB.agents=j.agents||DB.agents; closeModal(); toast('Agent saved','ok'); renderAll(); })
+    .catch(function(e){ toast(e.message,'err'); }); return; }
+  DB.agents=DB.agents||[];
+  var key=phone.replace(/\D/g,'').slice(-10);
+  var at=DB.agents.filter(function(x){ return String(x.phone).replace(/\D/g,'').slice(-10)===key; })[0];
+  if(at){ Object.assign(at,rec,{display:phone,phone:key}); }
+  else DB.agents.push(Object.assign({},rec,{display:phone,phone:key,device:''}));
+  closeModal(); toast('Agent saved','ok'); renderAll();
 }
 function renderGeoCard(){
   var ok=function(a,b){ return a===b?'resolved':'high'; };
@@ -1801,6 +1907,13 @@ function openIncident(ref){
       '<div class="mini"><div class="k">Severity</div><div class="v" style="font-size:15px">'+esc(i.severity)+'</div></div>'+
       '<div class="mini"><div class="k">Reported by</div><div class="v" style="font-size:15px">'+esc(i.agent)+'</div></div></div>'+
     '<div class="frow"><label>Polling unit</label><div style="font-size:13.5px">'+esc(i.puName)+' · <span class="mono">'+esc(i.puCode)+'</span></div></div>'+
+    (i.photo||i.lat ? '<div class="frow"><label>From the field</label>'+
+      (i.photo ? '<a class="evid" href="'+esc(i.photo)+'" target="_blank" rel="noopener">'+
+        '<span class="ei">'+I.cam+'</span><span class="et"><b>Photo attached</b><span>Opens in a new tab</span></span></a>' : '')+
+      (i.lat&&i.lng ? '<a class="evid" href="https://www.google.com/maps?q='+esc(i.lat)+','+esc(i.lng)+'" target="_blank" rel="noopener">'+
+        '<span class="ei">'+I.pinf+'</span><span class="et"><b>Where the agent stood</b>'+
+        '<span class="mono">'+esc(i.lat)+', '+esc(i.lng)+'</span></span></a>' : '')+
+      '</div>' : '')+
     '<div class="frow"><label>Description</label><div style="font-size:13.5px;line-height:1.6;background:var(--bg);border-radius:11px;padding:12px">'+esc(i.description)+'</div></div>'+
     (c?'<div class="frow"><label>Escalation contact</label><div class="who"><div class="ic">'+esc(initials(c.name.replace(/^\S+\.?\s/,'')))+'</div>'+
        '<div><div class="t">'+esc(c.name)+'</div><div class="s">'+esc(c.role)+' · '+esc(scopeLabel(c))+'</div></div>'+
@@ -1959,6 +2072,24 @@ document.addEventListener('click',function(ev){
   if(t.closest('#c-template')){ downloadTemplate(); return; }
   if(t.closest('#c-add')){ openModal(contactForm(null)); wireContactForm(null); return; }
   if(t.closest('#u-add')){ openModal(userForm(null)); return; }
+  if(t.closest('#ag-add')){ openModal(agentForm(null)); wireAgentForm(null); return; }
+  var ea=t.closest('[data-edit-agent]');
+  if(ea){ var ax=(DB.agents||[]).filter(function(a){ return String(a.phone)===ea.dataset.editAgent; })[0];
+    openModal(agentForm(ax)); wireAgentForm(ax); return; }
+  var sa=t.closest('[data-save-agent]'); if(sa){ saveAgent(); return; }
+  var ra=t.closest('[data-release-agent]');
+  if(ra){ if(live()){ apiPost({op:'releaseAgent',phone:ra.dataset.releaseAgent})
+      .then(function(j){ DB.agents=j.agents||DB.agents; toast('Handset released','ok'); renderAll(); })
+      .catch(function(e){ toast(e.message,'err'); }); return; }
+    var a2=(DB.agents||[]).filter(function(a){ return (a.display||a.phone)===ra.dataset.releaseAgent; })[0];
+    if(a2) a2.device=''; toast('Handset released','ok'); renderAll(); return; }
+  var da=t.closest('[data-del-agent]');
+  if(da){ if(live()){ apiPost({op:'deleteAgent',phone:da.dataset.delAgent})
+      .then(function(j){ DB.agents=j.agents||DB.agents; closeModal(); toast('Agent removed','ok'); renderAll(); })
+      .catch(function(e){ toast(e.message,'err'); }); return; }
+    var k=da.dataset.delAgent.replace(/\D/g,'').slice(-10);
+    DB.agents=(DB.agents||[]).filter(function(a){ return String(a.phone).replace(/\D/g,'').slice(-10)!==k; });
+    closeModal(); toast('Agent removed','ok'); renderAll(); return; }
   var ec=t.closest('[data-edit-contact]');
   if(ec){ var cx=DB.contacts.filter(function(c){return c.id===ec.dataset.editContact;})[0];
     openModal(contactForm(cx)); wireContactForm(cx); return; }
